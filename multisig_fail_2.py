@@ -21,13 +21,17 @@ msig = dev_setup.createMultiSigAcct(
 settings = Settings()
 client: AlgodClient = util.getAlgodClient(settings)
 
+
+print("")
 print("##############################")
 print("Now for sample single signing")
+print("")
+
 
 n = 5
 for i in range(n):
     i +=1
-    print(f"Making nft signed by wave ({i} of {n})")
+    print(f"Making nft signed by ocean ({i} of {n})")
     dev_setup.multiMakesNft(msig=msig, subAcct=oceanAccount)
 
 

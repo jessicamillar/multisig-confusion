@@ -22,9 +22,10 @@ settings = Settings()
 client: AlgodClient = util.getAlgodClient(settings)
 
 
-
+print("")
 print("##############################")
 print("Now for sample single signing")
+print("")
 
 n = 2
 for i in range(n):
