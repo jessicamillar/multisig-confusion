@@ -1,0 +1,3 @@
+pydantic
+pyteal
+py-algorand-sdk
