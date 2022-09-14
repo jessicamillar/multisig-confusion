@@ -5,7 +5,7 @@ from algosdk import encoding
 from algosdk.v2client.algod import AlgodClient
 import algosdk.error
 from algosdk.future import transaction
-from algosdk.future.transaction import Multisig, MultisigTransaction, wait_for_confirmation
+from algosdk.future.transaction import AssetCreateTxn, Multisig, MultisigTransaction, wait_for_confirmation, SignedTransaction
 from algosdk.kmd import KMDClient
 from settings import Settings
 import util
@@ -151,10 +151,14 @@ def sendSignedMtx(mtx: MultisigTransaction, subAcct: util.AlgoAccount) -> int:
     return nftID
 
 
-def makeSignAndReturnNftCreationMtx2(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
+def makeSignAndReturnNftCreationMtx(
+        msig: Multisig, 
+        subAcct: util.AlgoAccount
+        ) -> Tuple[AssetCreateTxn, MultisigTransaction]:
     """ 
-    Makes a transaction for creating an NFT,
-    signs with the subaccount, returns signed but unsent MultisigTransaction""" 
+    Makes a transaction for creating an NFT by multisig,
+    signs with the subaccount, returns unsigned transaction and
+    signed but unsent MultisigTransaction""" 
     
     settings = Settings()
     client: AlgodClient = util.getAlgodClient(settings)
@@ -167,45 +171,77 @@ def makeSignAndReturnNftCreationMtx2(msig: Multisig, subAcct: util.AlgoAccount) 
             default_frozen=False,
             manager=msig.address(),
             asset_name=f"SeaWave{randomNumber}",
-            unit_name=f"W",
+            unit_name=f"W{randomNumber}",
             note=randomNote,
             sp=client.suggested_params(),
     )
     mtx = MultisigTransaction(txn, msig)
     mtx.sign(subAcct.sk)
-    return mtx
+    return [txn, mtx]
 
 
-def makeSignAndReturnNftCreationMtx(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
+def makeSignAndReturnNftCreationSingle(
+        acct: util.AlgoAccount
+        ) -> Tuple[AssetCreateTxn, SignedTransaction]:
     """ 
-    Makes a transaction for creating an NFT,
-    signs with the subaccount, returns signed but unsent MultisigTransaction""" 
-    randomNumber = randint(0, 999)
+    Makes a signed transaction for creating an NFT with a single account,
+    and returns the txn before sig and also the SignedTransaction"""
+
     settings = Settings()
     client: AlgodClient = util.getAlgodClient(settings)
+    randomNumber = randint(0, 999)
+    randomNote = bytes(randint(0, 255) for _ in range(20))
     txn = transaction.AssetCreateTxn(
-            sender=msig.address(),
+            sender=acct.address(),
             total=1,
             decimals=0,
             default_frozen=False,
-            manager=msig.address(),
+            manager=acct.address(),
             asset_name=f"SeaWave{randomNumber}",
-            unit_name=f"W",
+            unit_name=f"W{randomNumber}",
+            note=randomNote,
             sp=client.suggested_params(),
     )
-    mtx = MultisigTransaction(txn, msig)
-    mtx.sign(subAcct.sk)
-    return mtx
+    stx = txn.sign(acct.sk)
+    return txn, stx
 
 
-def multiMakesNft(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
-    mtx = makeSignAndReturnNftCreationMtx(msig, subAcct)
+def multiMakesNft(
+        msig: Multisig, 
+        subAcct: util.AlgoAccount
+        ) -> Tuple[bool, AssetCreateTxn, MultisigTransaction]:
+    """multisig account makes an NFT
+    Returns:
+        Tuple[bool, AssetCreateTxn, MultisigTransaction]: bool True if 
+        asset was created, False if AlgoHTTPError thrown. Also
+        returns the transaction and the multsig signed mtx
+    """
+    txn, mtx = makeSignAndReturnNftCreationMtx(msig, subAcct)
     try:
         sendSignedMtx(mtx, subAcct)
     except algosdk.error.AlgodHTTPError as e: 
         print(f"AlgoHTTPError: {e}")
         print(mtx.multisig.json_dictify())
-        return mtx
+        return False, txn, mtx
     print("success sending")
     print(mtx.multisig.json_dictify())
-    return mtx
+    return True, txn, mtx
+
+
+def singleMakesNft(acct: util.AlgoAccount) -> Tuple[AssetCreateTxn, SignedTransaction]:
+    """regular singal sign account makes an NFT
+    Returns:
+        Tuple[bool, AssetCreateTxn, SignedTransaction]: bool True if 
+        asset was created, False if AlgoHTTPError thrown. Also
+        returns the transaction and the multsig signed mtx
+    """
+    txn, stx = makeSignAndReturnNftCreationSingle(acct)
+    try:
+        sendSignedMtx(stx, acct)
+    except algosdk.error.AlgodHTTPError as e: 
+        print(f"AlgoHTTPError: {e}")
+        print(f"Signature {stx.signature}")
+        return False, txn, stx
+    print("success sending")
+    print(f"Signature {stx.signature}")
+    return True, txn, stx
