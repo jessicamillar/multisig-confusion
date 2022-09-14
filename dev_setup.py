@@ -3,6 +3,7 @@ from typing import Optional, List, Tuple
 from random import choice
 from algosdk import encoding
 from algosdk.v2client.algod import AlgodClient
+import algosdk.error
 from algosdk.future import transaction
 from algosdk.future.transaction import Multisig, MultisigTransaction, wait_for_confirmation
 from algosdk.kmd import KMDClient
@@ -137,8 +138,48 @@ def createMultiSigAcct(
     return msig
 
 
-def multiMakesNft(msig: Multisig, subAcct: util.AlgoAccount) -> int:
-    """ signs with the subaccount, returns nftID""" 
+def sendSignedMtx(mtx: MultisigTransaction, subAcct: util.AlgoAccount) -> int:
+    # Sending signed transaction
+    settings = Settings()
+    client: AlgodClient = util.getAlgodClient(settings)
+    txid = client.send_raw_transaction(
+        encoding.msgpack_encode(mtx)) 
+    print("Sent. Waiting for confirmation")
+    confirmed_txn = wait_for_confirmation(client, txid, 6)
+    nftID = confirmed_txn['asset-index']
+    print(nftID)
+    return nftID
+
+
+def makeSignAndReturnNftCreationMtx2(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
+    """ 
+    Makes a transaction for creating an NFT,
+    signs with the subaccount, returns signed but unsent MultisigTransaction""" 
+    
+    settings = Settings()
+    client: AlgodClient = util.getAlgodClient(settings)
+    randomNumber = randint(0, 999)
+    randomNote = bytes(randint(0, 255) for _ in range(20))
+    txn = transaction.AssetCreateTxn(
+            sender=msig.address(),
+            total=1,
+            decimals=0,
+            default_frozen=False,
+            manager=msig.address(),
+            asset_name=f"SeaWave{randomNumber}",
+            unit_name=f"W",
+            note=randomNote,
+            sp=client.suggested_params(),
+    )
+    mtx = MultisigTransaction(txn, msig)
+    mtx.sign(subAcct.sk)
+    return mtx
+
+
+def makeSignAndReturnNftCreationMtx(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
+    """ 
+    Makes a transaction for creating an NFT,
+    signs with the subaccount, returns signed but unsent MultisigTransaction""" 
     randomNumber = randint(0, 999)
     settings = Settings()
     client: AlgodClient = util.getAlgodClient(settings)
@@ -149,19 +190,22 @@ def multiMakesNft(msig: Multisig, subAcct: util.AlgoAccount) -> int:
             default_frozen=False,
             manager=msig.address(),
             asset_name=f"SeaWave{randomNumber}",
-            unit_name="Water",
+            unit_name=f"W",
             sp=client.suggested_params(),
-        )
-
+    )
     mtx = MultisigTransaction(txn, msig)
     mtx.sign(subAcct.sk)
+    return mtx
 
-    # Sending signed transaction
-    txid = client.send_raw_transaction(
-        encoding.msgpack_encode(mtx)) 
-    print("Sent")
-    confirmed_txn = wait_for_confirmation(client, txid, 6)
-    nftID = confirmed_txn['asset-index']
-    print(nftID)
 
-    return nftID
+def multiMakesNft(msig: Multisig, subAcct: util.AlgoAccount) -> MultisigTransaction:
+    mtx = makeSignAndReturnNftCreationMtx(msig, subAcct)
+    try:
+        sendSignedMtx(mtx, subAcct)
+    except algosdk.error.AlgodHTTPError as e: 
+        print(f"AlgoHTTPError: {e}")
+        print(mtx.multisig.json_dictify())
+        return mtx
+    print("success sending")
+    print(mtx.multisig.json_dictify())
+    return mtx

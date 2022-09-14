@@ -4,6 +4,12 @@ Multisig with two signers, where either one can sign any transaction
 
 ISSUE: it seems that the single signature typically works once and then sporadically. 
 
+
+EXPLANATION: it was not an issue with multisig, but rather the sdk thought the tokens it
+was creating were the same.
+
+![alt_text](issue_uncovered.png)
+
 multisig_fail_1.py through multisig_fail_3.py give different failure examples. The failure condition is:
 
 `algosdk.error.AlgodHTTPError: At least one signature didn't pass verification`
@@ -17,3 +23,5 @@ in between failures. I.e. in sandbox repo:
 `./sandbox reset`
 
 If you don't reset, you will keep adding dollars to the accounts.
+
+

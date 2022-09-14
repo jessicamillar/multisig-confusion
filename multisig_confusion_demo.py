@@ -1,6 +1,6 @@
 """
 Run ./sandbox reset first
-5 NFTs made by ocean (first in msig signers list)
+5 NFTs made by wave (second in msig signers list)
 """
 
 from settings import Settings
@@ -18,8 +18,10 @@ msig = dev_setup.createMultiSigAcct(
     waveAccount=waveAccount,
     threshold=1)
 
+
 settings = Settings()
 client: AlgodClient = util.getAlgodClient(settings)
+
 
 
 print("")
@@ -28,10 +30,7 @@ print("Now for sample single signing")
 print("")
 
 
-n = 5
-for i in range(n):
-    i +=1
-    print(f"Making nft signed by ocean ({i} of {n})")
-    dev_setup.multiMakesNft(msig=msig, subAcct=oceanAccount)
+mtx1 = dev_setup.multiMakesNft(msig=msig, subAcct=oceanAccount)
 
 
+mtx2 = dev_setup.multiMakesNft(msig=msig, subAcct=waveAccount)
